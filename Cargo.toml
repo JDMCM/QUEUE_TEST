@@ -1,0 +1,12 @@
+[package]
+name = "QUEUE_TEST"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+csv = "1.3.0"
+rayon = "1.10.0"
+
+[[bin]]
+name = "QUEUE_TEST"
+path = "main.rs"
