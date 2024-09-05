@@ -3,43 +3,40 @@ use csv;
 use serde;
 
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "PascalCase")]
+//#[serde(rename_all = "PascalCase")]
 pub struct Rec {
-    p1:f64, 
-    p2:f64,
-    time:f64,
-    p1x:f64,
-    p1y:f64,
-    p1z:f64,
-    p1vx:f64,
-    p1vy:f64,
-    p1vz:f64,
-    p1r:f64,
-    p2x:f64, 
-    p2y:f64, 
-    p2z:f64, 
-    p2vx:f64, 
-    p2vy:f64, 
-    p2vz:f64, 
-    p2r:f64
+    pub I1:f64,
+    pub p1:f64, 
+    pub p2:f64,
+    pub time:f64,
+    pub p1x:f64,
+    pub p1y:f64,
+    pub p1z:f64,
+    pub p1vx:f64,
+    pub p1vy:f64,
+    pub p1vz:f64,
+    pub p1r:f64,
+    pub p2x:f64, 
+    pub p2y:f64, 
+    pub p2z:f64, 
+    pub p2vx:f64, 
+    pub p2vy:f64, 
+    pub p2vz:f64, 
+    pub p2r:f64
 }
 
 pub fn csvcon() ->Result<Vec<Rec>, Box<dyn Error>>  {
-    let mut file_path: String = String::new();
-    println!("Enter CSV file path :");
-    std::io::stdin().read_line(&mut file_path);
-    file_path = file_path.replace("\"","");
+    //let mut file_path: String = String::new();
+    //println!("Enter CSV file path :");
+    //std::io::stdin().read_line(&mut file_path);
+    //file_path = file_path.replace("\"","");
+    let mut rdr = csv::Reader::from_path("C:/Users/JD/Documents/GitHub/PYTHON-SCRIPTS/Hello_friend.csv")?;
 
-    let file = File::open(file_path)?;
-    
-   
-
-    let mut rdr = csv::Reader::from_reader(file);
-
-    let mut record:Vec<Rec> = Vec::new();
+    let mut matrix:Vec<Rec> = Vec::new();
     for result in rdr.deserialize() {
-        record.push(result.unwrap());
+        let record:Rec = result?;
+        matrix.push(record);
     }
-    return Ok(record);
+    return Ok(matrix);
    
 }
