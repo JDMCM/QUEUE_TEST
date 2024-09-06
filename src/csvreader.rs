@@ -2,7 +2,7 @@ use std::{env, error::Error, fs::File, ffi::OsString, process};
 use csv;
 use serde;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize,Clone, Copy)]
 //#[serde(rename_all = "PascalCase")]
 pub struct Rec {
     pub I1:f64,
