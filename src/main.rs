@@ -1,13 +1,14 @@
 use std::{env, error::Error, fs::File, ffi::OsString, process}; 
 
 mod csvreader;
+mod bucketqueue;
 
 fn main() {
     let mut arecord = csvreader::csvcon().unwrap();
 
 
 
-    let mut data : [Vec<csvreader::Rec>; 500] = core::array::from_fn(|_| Vec::new());
+    let mut data : Vec<Vec<csvreader::Rec>> = vec![Vec::new();500];
 
     
     let mut max:f64= 0.0;

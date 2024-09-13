@@ -1,6 +1,7 @@
-use std::{env, error::Error, fs::File, ffi::OsString, process}; 
+use std::{env,iter, cmp, error::Error, fs::File, ffi::OsString, process}; 
 use csv;
 use serde;
+use cmp::Ordering;
 
 #[derive(Debug, serde::Deserialize,Clone, Copy)]
 //#[serde(rename_all = "PascalCase")]
@@ -23,6 +24,19 @@ pub struct Rec {
     pub p2vy:f64, 
     pub p2vz:f64, 
     pub p2r:f64
+}
+
+impl PartialOrd for Rec {
+    fn partial_cmp(&self, other: &Rec) -> Option<Ordering> {
+        self.time.partial_cmp(&other.time)
+    }
+}
+
+
+impl PartialEq for Rec {
+    fn eq(&self, other: &Rec) -> bool {
+        self.time == other.time
+    }
 }
 
 pub fn csvcon() ->Result<Vec<Rec>, Box<dyn Error>>  {
