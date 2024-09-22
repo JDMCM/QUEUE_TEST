@@ -7,7 +7,6 @@ use cmp::Ordering;
 #[derive(Debug, serde::Deserialize,Clone, Copy)]
 //#[serde(rename_all = "PascalCase")]
 pub struct Rec {
-    pub I1:f64,
     pub p1:f64, 
     pub p2:f64,
     pub time:f64,
@@ -41,11 +40,12 @@ impl PartialEq for Rec {
 }
 
 pub fn csvcon() ->Result<Vec<Rec>, Box<dyn Error>>  {
-    //let mut file_path: String = String::new();
-    //println!("Enter CSV file path :");
-    //std::io::stdin().read_line(&mut file_path);
-    //file_path = file_path.replace("\"","");
-    let mut rdr = csv::Reader::from_path("C:/Users/JD/Documents/GitHub/PYTHON-SCRIPTS/Hello_friend.csv")?;
+    let mut file_path: String = String::new();
+    println!("Enter CSV file path :");
+    std::io::stdin().read_line(&mut file_path);
+    file_path = file_path.replace("\"","").replace("\\","/");
+    println!("{}1",file_path);
+    let mut rdr = csv::Reader::from_path(file_path.trim())?;
 
     let mut matrix:Vec<Rec> = Vec::new();
     for result in rdr.deserialize() {
