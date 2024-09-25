@@ -1,4 +1,4 @@
-use std;
+
 
 pub struct Bqueue<T:Copy + PartialOrd>{
     bucketwidth: f64,

@@ -1,9 +1,10 @@
-use std::{collections::BinaryHeap, env, error::Error, ffi::OsString, fs::File, process, time::Instant}; 
+use std::{collections::BinaryHeap, time::Instant}; 
 
 mod csvreader;
 mod bucketqueue;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
+
 
 fn main() {
     let mut arecord = csvreader::csvcon().unwrap();
@@ -14,14 +15,15 @@ fn main() {
 
     
     let mut max:f64= 0.0;
-
+    //was orginally just a key value pair but, for the exculsion list to work
+    // an id to idenitfy what index pair of rocks is in the this key value was added 
     #[derive(Debug,Clone,Copy)]
     pub struct Keyval {
-        pub key:OrderedFloat<f64>,
-        pub val:csvreader::Rec,
-        pub id:(f64,f64)
+        pub key:OrderedFloat<f64>, //the time the pair collides at
+        pub val:csvreader::Rec, //all information p1,p2,p1x,p2x .. etc
+        pub id:(f64,f64)        //p1,p2
     }
-
+    // keyval needs to be ordered so I can stick it in a priority queue
     impl Ord for Keyval {
         fn cmp(&self, other: &Self) -> Ordering {
             self.key.cmp(&other.key)
@@ -45,44 +47,54 @@ fn main() {
 
 
 
+    //finds the end time of the entire data set
     for i in 0..arecord.len() {
         let poppy = arecord[i];
-        if(poppy.time > max) {
+        if poppy.time > max {
             max = poppy.time;
         }
     }
 
     while !arecord.is_empty() {
-        let poppy = arecord.pop().unwrap();
-        let index:usize = (poppy.time/(max/500.0)).floor() as usize;
+        //here is why arecord is a dequeue as the entries into data need to be in the same order 
+        //as the entries into arecord
+        let poppy = arecord.pop_front().unwrap();
+        //uses the max to find which global timestep each record belongs to then places them 
+        //in the corresponding vector
+        let index:usize = (poppy.time/(max/500.0)).floor() as usize; 
         data[index].push(Keyval{key:OrderedFloat(poppy.time),val:poppy,id:(poppy.p1,poppy.p2)});
 
     }
     let now = Instant::now();
 
-    let mut heap: BinaryHeap<Keyval> = BinaryHeap::new();
-    let mut exc: Vec<(f64,f64)> = Vec::new();
+    let mut heap: BinaryHeap<Keyval> = BinaryHeap::new(); //intialize the queue
+    let mut exc: Vec<(f64,f64)> = Vec::new(); //intialize the exculsion list of ids
 
-
+    // j and i got flipped from standard notation i nested in j instead of the the other way around
     for j in 0..data.len() {
+        exc = Vec::new(); //each bif loop has a new exculsion list as the heap is emptied each j iteration
         exc.push(data[j][0].id);
         heap.push(data[j][0]);
         for i in 0..data[j].len() {
-            if  !exc.contains(&data[j][i].id)  {
+            // if the id of the item to be added is not already in the exculsion list 
+            // it is added to the heap then it's id is added to the exclusion list
+            if  !exc.contains(&data[j][i].id)  { 
+
                 exc.push(data[j][i].id);
                 heap.push(data[j][i]);
             } else if !heap.is_empty()  {
-                let mut y = heap.pop().unwrap();
-                exc.retain(|x| x != &y.id );
-                while y.id != data[j][i].id && !heap.is_empty() {
-                    y = heap.pop().unwrap();
-                    exc.retain(|x| x != &y.id );
-                }   
+                while  !heap.is_empty() && heap.peek().unwrap().id != data[j][i].id {
+                    let y = heap.pop().unwrap().id;
+                    exc.retain(|x| x != &y ); //still has to remove the ids that are popped from the heap before the repeat id
+                }
             }
             
         }
-        while !heap.is_empty() {
+        //clears the queue after everything in a big timestep has been processed 
+        while !heap.is_empty() { 
             heap.pop();
+            //exc.pop();
+            
         }
     }
 

@@ -1,6 +1,7 @@
-use std::{env,iter, cmp, error::Error, fs::File, ffi::OsString, process}; 
+use std::{ cmp, error::Error}; 
 use csv;
 use serde;
+use std::collections::VecDeque;
 
 use cmp::Ordering;
 
@@ -39,7 +40,7 @@ impl PartialEq for Rec {
     }
 }
 
-pub fn csvcon() ->Result<Vec<Rec>, Box<dyn Error>>  {
+pub fn csvcon() ->Result<VecDeque<Rec>, Box<dyn Error>>  {
     let mut file_path: String = String::new();
     println!("Enter CSV file path :");
     std::io::stdin().read_line(&mut file_path);
@@ -47,10 +48,10 @@ pub fn csvcon() ->Result<Vec<Rec>, Box<dyn Error>>  {
     println!("{}1",file_path);
     let mut rdr = csv::Reader::from_path(file_path.trim())?;
 
-    let mut matrix:Vec<Rec> = Vec::new();
+    let mut matrix:VecDeque<Rec> = VecDeque::new();
     for result in rdr.deserialize() {
         let record:Rec = result?;
-        matrix.push(record);
+        matrix.push_back(record);
     }
     return Ok(matrix);
    
