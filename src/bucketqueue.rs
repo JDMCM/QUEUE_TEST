@@ -106,7 +106,7 @@ mod tests {
 
         let mut vector = Vec::new();
 
-        for i in 1..=total {
+        for _i in 1..=total {
             let n:f64 = rng.gen_range(0.0..=max as f64);
             vector.push(n)
         }
