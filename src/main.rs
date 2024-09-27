@@ -68,11 +68,10 @@ fn main() {
     let now = Instant::now();
 
     let mut heap: BinaryHeap<Keyval> = BinaryHeap::new(); //intialize the queue
-    let mut exc: Vec<(f64,f64)> = Vec::new(); //intialize the exculsion list of ids
 
     // j and i got flipped from standard notation i nested in j instead of the the other way around
     for j in 0..data.len() {
-        exc = Vec::new(); //each bif loop has a new exculsion list as the heap is emptied each j iteration
+        let mut exc = Vec::new(); //each bif loop has a new exculsion list as the heap is emptied each j iteration
         exc.push(data[j][0].id);
         heap.push(data[j][0]);
         for i in 0..data[j].len() {
@@ -108,11 +107,10 @@ fn main() {
 
 
     let mut heap1: bucketqueue::Bqueue<Keyval> = bucketqueue::Bqueue::new((max/delta.ceil()+1.0) as usize,delta); //intialize the Bucket queue
-    let mut exc1: Vec<(f64,f64)> = Vec::new(); //intialize the exculsion list of ids
 
     // j and i got flipped 
     for j in 0..data.len() {
-        exc1 = Vec::new(); //each j loop has a new exculsion list as the heap is emptied each j iteration
+        let mut exc1 = Vec::new(); //each j loop has a new exculsion list as the heap is emptied each j iteration
         exc1.push(data[j][0].id);
         heap1.push(data[j][0],data[j][0].val.time);
         for i in 0..data[j].len() {

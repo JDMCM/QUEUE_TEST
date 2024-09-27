@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use rand::Rng;
-use csv::Error;
+
 
 
 
@@ -66,7 +66,6 @@ impl<T:Copy + PartialOrd> Bqueue<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::cmp::min;
 
     use super::*;
     
