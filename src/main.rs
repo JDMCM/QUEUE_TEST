@@ -1,4 +1,4 @@
-use std::{collections::BinaryHeap, time::Instant}; 
+use std::{collections::BinaryHeap, f64::consts::PI, time::Instant}; 
 
 mod csvreader;
 mod bucketqueue;
@@ -100,7 +100,47 @@ fn main() {
 
 
     let elapsed = now.elapsed();
-    println!("Elapsed: {:.2?}", elapsed);
+    println!("Binary Heap Elapsed: {:.2?}", elapsed);
+
+    let now1 = Instant::now();
+
+    let delta:f64 = 2.0*PI*1E-4 - 2.0*PI*1E-5;
+
+
+    let mut heap: bucketqueue::Bqueue<Keyval> = bucketqueue::Bqueue::new((max/delta.ceil()) as usize,delta); //intialize the Bucket queue
+    let mut exc: Vec<(f64,f64)> = Vec::new(); //intialize the exculsion list of ids
+
+    // j and i got flipped 
+    for j in 0..data.len() {
+        exc = Vec::new(); //each j loop has a new exculsion list as the heap is emptied each j iteration
+        exc.push(data[j][0].id);
+        heap.push(data[j][0],data[j][0].val.time);
+        for i in 0..data[j].len() {
+            // if the id of the item to be added is not already in the exculsion list 
+            // it is added to the heap then it's id is added to the exclusion list
+            if  !exc.contains(&data[j][i].id)  { 
+
+                exc.push(data[j][i].id);
+                heap.push(data[j][i], data[j][i].val.time);
+            } else if !heap.is_empty()  {
+                while  !heap.is_empty() && heap.peek().unwrap().id != data[j][i].id {
+                    let y = heap.pop().unwrap().id;
+                    exc.retain(|x| x != &y ); //still has to remove the ids that are popped from the heap before the repeat id
+                }
+            }
+            
+        }
+        //clears the queue after everything in a big timestep has been processed 
+        while !heap.is_empty() { 
+            heap.pop();
+            //exc.pop();
+            
+        }
+    }
+
+
+    let elapsed1 = now1.elapsed();
+    println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
     //println!("{}",data[100].len());
     //println!("first p1: {}",arecord[0].p1);
 
