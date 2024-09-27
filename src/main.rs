@@ -106,7 +106,7 @@ fn main() {
     let delta:f64 = 2.0*PI*1E-4 - 2.0*PI*1E-5;
 
 
-    let mut heap1: bucketqueue::Bqueue<Keyval> = bucketqueue::Bqueue::new((max/delta.ceil()+1.0) as usize,delta); //intialize the Bucket queue
+    let mut heap1: bucketqueue::Bqueue<Keyval> = bucketqueue::Bqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
 
     // j and i got flipped 
     for j in 0..data.len() {
