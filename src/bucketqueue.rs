@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
-use rand::Rng;
+use ordered_float::OrderedFloat;
 
-
-
+pub trait HasKey {
+    fn key(&self) -> OrderedFloat<f64>;
+}
 
 pub struct Bqueue<T:Copy + PartialOrd>{
     bucketwidth: f64,
@@ -11,7 +12,7 @@ pub struct Bqueue<T:Copy + PartialOrd>{
     start: usize
 }
 
-impl<T:Copy + PartialOrd> Bqueue<T> {
+impl<'a, T:PartialOrd + HasKey> Bqueue<&'a T> {
     pub fn new(bucketnum: usize, bucketwidth: f64) -> Self {
         return Self {
             len: 0,
@@ -21,8 +22,8 @@ impl<T:Copy + PartialOrd> Bqueue<T> {
         }
     }
 
-    pub fn push(&mut self, elem: T,key: f64) {
-        let index = (key/self.bucketwidth).floor() as usize;
+    pub fn push(&mut self, elem: &'a T) {
+        let index = (elem.key()/self.bucketwidth).floor() as usize;
         self.data[index].push_back(elem);
         self.len = self.len +1;
         if index < self.start || self.len() == 1{
@@ -30,7 +31,7 @@ impl<T:Copy + PartialOrd> Bqueue<T> {
         }
     }
 
-    pub fn pop(&mut self) -> Option<T>{
+    pub fn pop(&mut self) -> Option<&T>{
         if self.is_empty() {
             return None
         } else {
@@ -49,9 +50,8 @@ impl<T:Copy + PartialOrd> Bqueue<T> {
         if self.is_empty() {
             return None
         } else {
-            return self.data[self.start].front()
+            return self.data[self.start].front().copied()
         }
-        
     }
 
     pub fn is_empty(&self) -> bool {
@@ -67,28 +67,40 @@ impl<T:Copy + PartialOrd> Bqueue<T> {
 #[cfg(test)]
 mod tests {
 
+    use rand::Rng;
+
     use super::*;
+
+    impl HasKey for f64 {
+        fn key(&self) -> OrderedFloat<f64> {
+            OrderedFloat(*self)
+        }
+    }
     
     #[test]
     fn it_works() {
         let max = 500;
         let div = 5;
         let total = max*div;
+        let value = 500.0;
 
-        let mut heap1: Bqueue<f64> = Bqueue::new(max+1,1.0);
+        let mut heap1: Bqueue<&f64> = Bqueue::new(max+1,1.0);
         assert_eq!(heap1.is_empty(), true);
-        heap1.push(500.0,500.0);
+        heap1.push(&value);
         assert_eq!(heap1.is_empty(), false);
         assert_eq!(heap1.len(), 1);
-        assert_eq!(heap1.peek(), Some(&500.0));
-        assert_eq!(heap1.pop(), Some(500.0));
+        assert_eq!(heap1.peek(), Some(&value));
+        assert_eq!(heap1.pop(), Some(&value));
         assert_eq!(heap1.is_empty(), true);
 
         
-    
+        let mut values = Vec::new();
         for i in 1..=total {
             let y = (i as f64)/div as f64;
-            heap1.push(y, y);
+            values.push(y);
+        }
+        for i in 1..=total {
+            heap1.push(&values[i]);
             assert_eq!(heap1.len(), i);
             assert_eq!(heap1.peek(), Some(&(1.0/div as f64)));
         }
@@ -96,7 +108,7 @@ mod tests {
         for i in 1..=total {
             let y = (i as f64)/div as f64;
             assert_eq!(heap1.peek(), Some(&y));
-            assert_eq!(heap1.pop(), Some(y));
+            assert_eq!(heap1.pop(), Some(&y));
             assert_eq!(heap1.len(), total-i);
             
         }
@@ -116,8 +128,8 @@ mod tests {
         
 
         for i in 1..=total {
-            let y = vector[i-1];
-            heap1.push(y, y);
+            let y = &vector[i-1];
+            heap1.push(y);
             assert_eq!(heap1.len(), i);
             let min = &vector[0..i].iter().fold(f64::INFINITY, |a, &b| a.min(b));
             assert_eq!(heap1.peek().unwrap().floor(), min.floor());
