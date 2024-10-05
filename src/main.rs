@@ -5,47 +5,42 @@ mod bucketqueue;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 
+#[derive(Debug,Clone,Copy)]
+pub struct Keyval {
+    pub key:OrderedFloat<f64>, //the time the pair collides at
+    pub val:csvreader::Rec, //all information p1,p2,p1x,p2x .. etc
+    pub id:(f64,f64),        //p1,p2
+    pub index: usize        //so it can be looked up easy within the data matrix
+}
+// keyval needs to be ordered so I can stick it in a priority queue
+impl Ord for Keyval {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.key.cmp(&other.key)
+    }
+}
+
+impl PartialOrd for Keyval {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Keyval {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for Keyval {}
 
 fn main() {
     let mut arecord = csvreader::csvcon().unwrap();
 
-
-
     let mut data : Vec<Vec<Keyval>> = vec![Vec::new();500];
-
     
     let mut max:f64= 0.0;
     //was orginally just a key value pair but, for the exculsion list to work
     // an id to idenitfy what index pair of rocks is in the this key value was added 
-    #[derive(Debug,Clone,Copy)]
-    pub struct Keyval {
-        pub key:OrderedFloat<f64>, //the time the pair collides at
-        pub val:csvreader::Rec, //all information p1,p2,p1x,p2x .. etc
-        pub id:(f64,f64),        //p1,p2
-        pub index: usize        //so it can be looked up easy within the data matrix
-    }
-    // keyval needs to be ordered so I can stick it in a priority queue
-    impl Ord for Keyval {
-        fn cmp(&self, other: &Self) -> Ordering {
-            self.key.cmp(&other.key)
-        }
-    }
-
-    impl PartialOrd for Keyval {
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    impl PartialEq for Keyval {
-        fn eq(&self, other: &Self) -> bool {
-            self.key == other.key
-        }
-    }
-
-    impl Eq for Keyval {}
-
-
 
 
     //finds the end time of the entire data set
@@ -68,8 +63,6 @@ fn main() {
 
     }
     let now = Instant::now();
-
-    
 
     let mut heapt: BinaryHeap<Keyval> = BinaryHeap::new();
 
