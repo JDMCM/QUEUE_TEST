@@ -10,7 +10,7 @@ use std::time::Duration;
 pub struct Keyval {
     pub key:OrderedFloat<f64>, //the time the pair collides at
     pub val:csvreader::Rec, //all information p1,p2,p1x,p2x .. etc
-    pub id:(f64,f64),        //p1,p2
+    pub id:(u32,u32),        //p1,p2
     pub index: usize        //so it can be looked up easy within the data matrix
 }
 // keyval needs to be ordered so I can stick it in a priority queue
@@ -86,7 +86,8 @@ fn time_seqential<PQ: SeqentialPriorityQueue<Keyval>>(data : &Vec<Vec<Keyval>>, 
             //if the set contains another element with the same id push the first occuring element into the priority queue
             for k in &data[i][index+1..] {
                 if k.id == id {
-                    heapt.push(data[i][k.index]);  
+                    heapt.push(data[i][k.index]);
+                    break;
                 } 
             }
         }
@@ -123,7 +124,7 @@ fn main() {
         //in the corresponding vector
         let index:usize = (poppy.time/(max/500.0)).floor() as usize;
         let ind = data[index].len();
-        data[index].push(Keyval{key:OrderedFloat(poppy.time),val:poppy,id:(poppy.p1,poppy.p2),index: ind});
+        data[index].push(Keyval{key:OrderedFloat(poppy.time),val:poppy,id:(poppy.p1 as u32,poppy.p2 as u32),index: ind});
 
     }
     // let now = Instant::now();
