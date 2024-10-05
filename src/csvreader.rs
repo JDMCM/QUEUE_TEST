@@ -40,11 +40,8 @@ impl PartialEq for Rec {
     }
 }
 
-pub fn csvcon() ->Result<VecDeque<Rec>, Box<dyn Error>>  {
-    let mut file_path: String = String::new();
-    println!("Enter CSV file path :");
-    let _ = std::io::stdin().read_line(&mut file_path);
-    file_path = file_path.replace("\"","").replace("\\","/");
+pub fn csvcon(file: &String) ->Result<VecDeque<Rec>, Box<dyn Error>>  {
+    let file_path = file.replace("\"","").replace("\\","/");
     println!("{}1",file_path);
     let mut rdr = csv::Reader::from_path(file_path.trim())?;
 

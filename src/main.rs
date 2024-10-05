@@ -97,7 +97,8 @@ fn time_seqential<PQ: SeqentialPriorityQueue<Keyval>>(data : &Vec<Vec<Keyval>>, 
 }
 
 fn main() {
-    let mut arecord = csvreader::csvcon().unwrap();
+    let args: Vec<String> = std::env::args().collect();
+    let mut arecord = csvreader::csvcon(&args[1]).unwrap();
 
     let mut data : Vec<Vec<Keyval>> = vec![Vec::new();500];
     
