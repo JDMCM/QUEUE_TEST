@@ -1,8 +1,10 @@
 use std::collections::HashSet;
+use std::sync::Mutex;
 pub(crate) use std::{collections::BinaryHeap, f64::consts::PI, time::Instant}; 
 
 mod csvreader;
 mod sequentialbucketqueue;
+mod parallelbucketqueue;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::time::Duration;
@@ -59,13 +61,44 @@ impl <'a, E: Ord> SeqentialPriorityQueue<'a, E> for BinaryHeap<&'a E> {
     }
 }
 
-pub trait ParrallelPriorityQueue<'a, E: Ord + 'a> {
+pub trait ParallelPriorityQueue<'a, E: Ord + 'a> {
     fn push(&mut self, e: &'a E);
     fn pop(&mut self) -> Option<&E>;
     fn is_empty(&self) -> bool;
     fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F);
-    fn bulk_push<I: Iterator<Item = Option<&'a E>>>(&mut self, es: I);
+    fn bulk_push<I: Iterator<Item = &'a E>>(&mut self, es: I);
     // fn bulk_pop(&mut self) -> &Vec<&'a E>;
+}
+
+struct LockingBinaryHeap<'a, E: Ord> {
+    pub locked_heap: Mutex<BinaryHeap<&'a E>>
+}
+
+impl <'a, E: Ord> ParallelPriorityQueue<'a, E> for LockingBinaryHeap<'a, E> {
+    fn push(&mut self, e: &'a E) {
+        let mut bh = self.locked_heap.lock().unwrap();
+        bh.push(e);
+    }
+    fn pop(&mut self) -> Option<&E> {
+        let mut bh = self.locked_heap.lock().unwrap();
+        bh.pop()
+    }
+    fn is_empty(&self) -> bool {
+        let bh = self.locked_heap.lock().unwrap();
+        bh.is_empty()
+    }
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
+        let mut bh = self.locked_heap.lock().unwrap();
+        // Pull off a certain number of elements. There should be checking for whether they are safe.
+        // Then run the function on those elements.
+        // Push the results.
+    }
+    fn bulk_push<I: Iterator<Item = &'a E>>(&mut self, es: I) {
+        let mut bh = self.locked_heap.lock().unwrap();
+        for e in es {
+            bh.push(e);
+        }
+    }
 }
 
 fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
@@ -96,18 +129,20 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
     (now.elapsed(), count)
 }
 
-fn time_parallel<'a, PQ: ParrallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
+fn time_parallel<'a, PQ: ParallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
     let now = Instant::now();
 
     for i in 0..data.len() {
         // Add initial population of events.
-        let mut ids = HashSet::new();        
+        let mut ids = HashSet::new();
+        let mut initial = Vec::new();
         for k in &data[i] {
             if !ids.contains(&k.id) {
-                heap.push(k);
+                initial.push(k);
                 ids.insert(k.id);
             }
         }
+        heap.bulk_push(initial.into_iter());
         // Process events in that step
         while !heap.is_empty() {
             heap.bulk_process(|elem| {

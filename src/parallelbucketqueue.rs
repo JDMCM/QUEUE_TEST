@@ -1,9 +1,13 @@
 use std::collections::VecDeque;
 use ordered_float::OrderedFloat;
-use rayon::iter::IntoParallelIterator;
 
-use crate::SeqentialPriorityQueue;
+use crate::ParallelPriorityQueue;
 
+pub trait HasKey {
+    fn key(&self) -> OrderedFloat<f64>;
+}
+
+#[derive(Debug)]
 pub struct ParBqueue<T:Copy + PartialOrd>{
     bucketwidth: f64,
     len: usize,
@@ -15,8 +19,8 @@ impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
     pub fn new(bucketnum: usize, bucketwidth: f64) -> Self {
         return Self {
             len: 0,
-            start: 0,
-            bucketwidth: bucketwidth,
+            start: bucketnum,
+            bucketwidth,
             data: vec![VecDeque::new();bucketnum]
         }
     }
@@ -24,8 +28,8 @@ impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
     pub fn push(&mut self, elem: &'a T) {
         let index = (elem.key()/self.bucketwidth).floor() as usize;
         self.data[index].push_back(elem);
-        self.len = self.len +1;
-        if index < self.start || self.len() == 1{
+        self.len += 1;
+        if index < self.start {
             self.start = index;
         }
     }
@@ -35,11 +39,9 @@ impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
             return None
         } else {
             let y = self.data[self.start].pop_front();
-            self.len = self.len -1;
-            if !self.is_empty() {
-                while self.data[self.start].is_empty() {
-                    self.start = self.start +1;
-                }
+            self.len -= 1;
+            while self.start < self.data.len() && self.data[self.start].is_empty() {
+                self.start = self.start +1;
             }
             return y
         }
@@ -54,9 +56,10 @@ impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.len == 0;
+        return self.start >= self.data.len();
     }
 
+    // If we don't want this method, this version can get rid of the len field completely.
     pub fn len(&self) -> usize {
         return self.len;
     }
@@ -72,6 +75,12 @@ impl <'a, E: Ord + HasKey> ParallelPriorityQueue<'a, E> for ParBqueue<&'a E> {
     }
     fn is_empty(&self) -> bool {
         ParBqueue::is_empty(self)
+    }
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
+
+    }
+    fn bulk_push<I: Iterator<Item = &'a E>>(&mut self, es: I) {
+      
     }
 }
 
@@ -110,9 +119,9 @@ mod tests {
             let y = (i as f64)/div as f64;
             values.push(y);
         }
-        for i in 1..=total {
+        for i in 0..total {
             heap1.push(&values[i]);
-            assert_eq!(heap1.len(), i);
+            assert_eq!(heap1.len(), i + 1);
             assert_eq!(heap1.peek(), Some(&(1.0/div as f64)));
         }
         assert_eq!(heap1.len(), total);
