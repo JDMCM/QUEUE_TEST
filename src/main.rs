@@ -2,9 +2,8 @@ use std::collections::HashSet;
 pub(crate) use std::{collections::BinaryHeap, f64::consts::PI, time::Instant}; 
 
 mod csvreader;
-mod bucketqueue;
+mod sequentialbucketqueue;
 use ordered_float::OrderedFloat;
-use rayon::iter::IntoParallelIterator;
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -36,7 +35,7 @@ impl PartialEq for KeyVal {
 
 impl Eq for KeyVal {}
 
-impl bucketqueue::HasKey for KeyVal {
+impl sequentialbucketqueue::HasKey for KeyVal {
     fn key(&self) -> OrderedFloat<f64> {
         self.key
     }
@@ -60,21 +59,12 @@ impl <'a, E: Ord> SeqentialPriorityQueue<'a, E> for BinaryHeap<&'a E> {
     }
 }
 
-impl <'a, E: Ord + bucketqueue::HasKey> SeqentialPriorityQueue<'a, E> for bucketqueue::Bqueue<&'a E> {
-    fn push(&mut self, e: &'a E) {
-        bucketqueue::Bqueue::push(self, e);
-    }
-    fn pop(&mut self) -> Option<&E> {
-        bucketqueue::Bqueue::pop(self)
-    }
-    fn is_empty(&self) -> bool {
-        bucketqueue::Bqueue::is_empty(self)
-    }
-}
-
 pub trait ParrallelPriorityQueue<'a, E: Ord + 'a> {
+    fn push(&mut self, e: &'a E);
+    fn pop(&mut self) -> Option<&E>;
+    fn is_empty(&self) -> bool;
     fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F);
-    // fn bulk_push<I: Iterator<Item = Option<&'a E>>>(&mut self, es: I);
+    fn bulk_push<I: Iterator<Item = Option<&'a E>>>(&mut self, es: I);
     // fn bulk_pop(&mut self) -> &Vec<&'a E>;
 }
 
@@ -83,7 +73,8 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
     let mut count = 0;
 
     for i in 0..data.len() {
-        // Add initial population of events.
+        // Add initial population of events. In a real simulation, this also happens in parallel because we are walking throug the tree in
+        // parallel doing the search. I'm not certain how to model that here.
         let mut ids = HashSet::new();        
         for k in &data[i] {
             if !ids.contains(&k.id) {
@@ -105,7 +96,7 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
     (now.elapsed(), count)
 }
 
-fn time_parallel<'a, PQ: SeqentialPriorityQueue<'a, KeyVal> + ParrallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
+fn time_parallel<'a, PQ: ParrallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
     let now = Instant::now();
 
     for i in 0..data.len() {
@@ -171,7 +162,7 @@ fn main() {
     let delta:f64 = 2.0*PI*1E-4 - 2.0*PI*1E-5;
 
 
-    let mut heap1: bucketqueue::Bqueue<&KeyVal> = bucketqueue::Bqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
+    let mut heap1: sequentialbucketqueue::Bqueue<&KeyVal> = sequentialbucketqueue::Bqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
     let elapsed1 = time_seqential(&data, &mut heap1);
     println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
