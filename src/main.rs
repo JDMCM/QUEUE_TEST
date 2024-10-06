@@ -4,6 +4,7 @@ pub(crate) use std::{collections::BinaryHeap, f64::consts::PI, time::Instant};
 mod csvreader;
 mod bucketqueue;
 use ordered_float::OrderedFloat;
+use rayon::iter::IntoParallelIterator;
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -71,17 +72,18 @@ impl <'a, E: Ord + bucketqueue::HasKey> SeqentialPriorityQueue<'a, E> for bucket
     }
 }
 
-fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> Duration {
+pub trait ParrallelPriorityQueue<'a, E: Ord + 'a> {
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F);
+    // fn bulk_push<I: Iterator<Item = Option<&'a E>>>(&mut self, es: I);
+    // fn bulk_pop(&mut self) -> &Vec<&'a E>;
+}
+
+fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
     let now = Instant::now();
+    let mut count = 0;
 
     for i in 0..data.len() {
-        //find a set of the first occuring unique index events
-        //let &unq_set = &data[i];
-        //sort them by index then order the indexs by time
-        //unq_set.sort_by(|a,b| (a.id,a.key).partial_cmp(&(b.id,b.key)).unwrap());
-        //unq_set.dedup_by(|a,b| a.id.eq(&b.id));
-        //add the first unique ids to the priority queue
-
+        // Add initial population of events.
         let mut ids = HashSet::new();        
         for k in &data[i] {
             if !ids.contains(&k.id) {
@@ -89,23 +91,43 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
                 ids.insert(k.id);
             }
         }
+        // Process events in that step
         while !heap.is_empty() {
             //pop the first element
             let elem = heap.pop().unwrap();
             let id = elem.id;
             let index = elem.index;
             //if the set contains another element with the same id push the first occuring element into the priority queue
-            for k in &data[i][index+1..] {
-                if k.id == id {
-                    heap.push(&data[i][k.index]);
-                    break;
-                } 
-            }
+            count += 1;
+            data[i][index+1..].into_iter().find(|k| k.id == id).iter().for_each(|k| heap.push(k));
         }
     }
+    (now.elapsed(), count)
+}
 
+fn time_parallel<'a, PQ: SeqentialPriorityQueue<'a, KeyVal> + ParrallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
+    let now = Instant::now();
 
-    now.elapsed()
+    for i in 0..data.len() {
+        // Add initial population of events.
+        let mut ids = HashSet::new();        
+        for k in &data[i] {
+            if !ids.contains(&k.id) {
+                heap.push(k);
+                ids.insert(k.id);
+            }
+        }
+        // Process events in that step
+        while !heap.is_empty() {
+            heap.bulk_process(|elem| {
+                let id = elem.id;
+                let index = elem.index;
+                //if the set contains another element with the same id push the first occuring element into the priority queue
+                data[i][index+1..].into_iter().find(|k| k.id == id)
+            });
+        }
+    }
+    (now.elapsed(), 0)
 }
 
 fn main() {
