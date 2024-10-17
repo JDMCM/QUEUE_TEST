@@ -1,10 +1,12 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 pub(crate) use std::{collections::BinaryHeap, f64::consts::PI, time::Instant}; 
+use rayon::prelude::*;
 
 mod csvreader;
 mod sequentialbucketqueue;
 mod parallelbucketqueue;
+mod tryingmybesthere;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::time::Duration;

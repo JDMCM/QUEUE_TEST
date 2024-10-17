@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use ordered_float::OrderedFloat;
+use rayon::prelude::*;
 
 use crate::ParallelPriorityQueue;
 
@@ -8,14 +9,14 @@ pub trait HasKey {
 }
 
 #[derive(Debug)]
-pub struct ParBqueue<T:Copy + PartialOrd>{
+pub struct ParBqueue<T:Copy + PartialOrd + Sized + Send>{
     bucketwidth: f64,
     len: usize,
     data: Vec<VecDeque<T>>,
     start: usize
 }
 
-impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
+impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParBqueue<&'a T> {
     pub fn new(bucketnum: usize, bucketwidth: f64) -> Self {
         return Self {
             len: 0,
@@ -47,6 +48,8 @@ impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
         }
     }
 
+   
+
     pub fn peek(&self) -> Option<&T> {
         if self.is_empty() {
             return None
@@ -66,7 +69,7 @@ impl<'a, T:PartialOrd + HasKey> ParBqueue<&'a T> {
 
 }
 
-impl <'a, E: Ord + HasKey> ParallelPriorityQueue<'a, E> for ParBqueue<&'a E> {
+impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for ParBqueue<&'a E> {
     fn push(&mut self, e: &'a E) {
         ParBqueue::push(self, e);
     }
