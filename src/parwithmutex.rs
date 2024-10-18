@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
-use crossbeam_queue::SegQueue;
+use std::sync::{Mutex,Arc};
+use std::rc::Rc;
 
 use crate::ParallelPriorityQueue;
 
@@ -10,26 +11,26 @@ pub trait HasKey {
 }
 
 #[derive(Debug)]
-pub struct ParBqueue<T:Copy + PartialOrd + Sized + Send>{
+pub struct ParaBqueue<T:Copy + PartialOrd + Sized + Send>{
     bucketwidth: f64,
     len: usize,
-    data: Vec<SegQueue<T>>,
+    data: Vec<Arc<Mutex<VecDeque<T>>>>,
     start: usize
 }
 
-impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParBqueue<&'a T> {
+impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParaBqueue<&'a T> {
     pub fn new(bucketnum: usize, bucketwidth: f64) -> Self {
         return Self {
             len: 0,
             start: bucketnum,
             bucketwidth,
-            data: Vec::with_capacity(bucketnum)
+            data: vec![Arc::new(Mutex::new(VecDeque::new()));bucketnum]
         }
     }
 
     pub fn push(&mut self, elem: &'a T) {
         let index = (elem.key()/self.bucketwidth).floor() as usize;
-        self.data[index].push(elem);
+        self.data[index].lock().unwrap().push_back(elem);
         self.len += 1;
         if index < self.start {
             self.start = index;
@@ -40,40 +41,24 @@ impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParBqueue<&'a T> {
         if self.is_empty() {
             return None
         } else {
-            let y = self.data[self.start].pop();
+            let y = self.data[self.start].lock().unwrap().pop_front();
             self.len -= 1;
-            while self.start < self.data.len() && self.data[self.start].is_empty() {
+            while self.start < self.data.len() && self.data[self.start].lock().unwrap().is_empty() {
                 self.start = self.start +1;
             }
             return y
         }
     }
 
-    pub fn bulk_push(&mut self, elem: Vec<&'a T>) {
-        // let mathed: Vec<(T,usize)> = elem.into_par_iter().map(|i| {
-        //     return (i,(i.key()/self.bucetwidth).floor() as usize)
-        // }).collect();
+   
 
-        let mut math: Vec<&'a T> = elem;
-    
-        let maths = math.into_par_iter().for_each(|i| {
-            self.data[(i.key()/self.bucketwidth).floor() as usize].push(i);
-        });
-
-    
-        
-
-
+    pub fn peek(&self) -> Option<&T> {
+        if self.is_empty() {
+            return None
+        } else {
+            return self.data[self.start].lock().unwrap().front().copied()
+        }
     }
-
-
-    // pub fn peek(&self) -> Option<&T> {
-    //     if self.is_empty() {
-    //         return None
-    //     } else {
-    //         return self.data[self.start].peek().copied()
-    //     }
-    // }
 
     pub fn is_empty(&self) -> bool {
         return self.start >= self.data.len();
@@ -86,15 +71,15 @@ impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParBqueue<&'a T> {
 
 }
 
-impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for ParBqueue<&'a E> {
+impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for ParaBqueue<&'a E> {
     fn push(&mut self, e: &'a E) {
-        ParBqueue::push(self, e);
+        ParaBqueue::push(self, e);
     }
     fn pop(&mut self) -> Option<&E> {
-        ParBqueue::pop(self)
+        ParaBqueue::pop(self)
     }
     fn is_empty(&self) -> bool {
-        ParBqueue::is_empty(self)
+        ParaBqueue::is_empty(self)
     }
     fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
 
@@ -124,12 +109,12 @@ mod tests {
         let total = max*div;
         let value = 500.0;
 
-        let mut heap1: ParBqueue<&f64> = ParBqueue::new(max+1,1.0);
+        let mut heap1: ParaBqueue<&f64> = ParaBqueue::new(max+1,1.0);
         assert_eq!(heap1.is_empty(), true);
         heap1.push(&value);
         assert_eq!(heap1.is_empty(), false);
         assert_eq!(heap1.len(), 1);
-        
+        assert_eq!(heap1.peek(), Some(&value));
         assert_eq!(heap1.pop(), Some(&value));
         assert_eq!(heap1.is_empty(), true);
 
@@ -142,12 +127,12 @@ mod tests {
         for i in 0..total {
             heap1.push(&values[i]);
             assert_eq!(heap1.len(), i + 1);
-            
+            assert_eq!(heap1.peek(), Some(&(1.0/div as f64)));
         }
         assert_eq!(heap1.len(), total);
         for i in 1..=total {
             let y = (i as f64)/div as f64;
-            
+            assert_eq!(heap1.peek(), Some(&y));
             assert_eq!(heap1.pop(), Some(&y));
             assert_eq!(heap1.len(), total-i);
             
@@ -172,13 +157,13 @@ mod tests {
             heap1.push(y);
             assert_eq!(heap1.len(), i);
             let min = &vector[0..i].iter().fold(f64::INFINITY, |a, &b| a.min(b));
-           
+            assert_eq!(heap1.peek().unwrap().floor(), min.floor());
         }
         assert_eq!(heap1.len(), total);
 
         for i in 1..=total {
             let min = sortvec.remove(0);
-            
+            assert_eq!(heap1.peek().unwrap().floor(), min.floor());
             assert_eq!(heap1.pop().unwrap().floor(), min.floor());
             assert_eq!(heap1.len(), total-i);
         }
