@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
-use std::sync::{Mutex,Arc};
+use std::sync::{Mutex,MutexGuard};
+
 
 use crate::ParallelPriorityQueue;
 
@@ -86,6 +87,22 @@ impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParaBqueue<&'a T> {
 
         self.len = self.len + elems.len();
     }
+
+    pub fn bulk_pop(&mut self) ->  Option<VecDeque<&T>> {
+        if self.is_empty() {
+            return None;
+        }else {
+            self.data.push(Mutex::new(VecDeque::new()));
+            let popped = self.data.swap_remove(self.start).into_inner().unwrap();
+            self.len = self.len - popped.len();
+            while self.start < self.data.len() && self.data[self.start].lock().unwrap().is_empty() {
+                self.start = self.start +1;
+            }
+            return Some(popped);
+        }
+        
+    }
+
 
 }
 
