@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
 use std::sync::{Mutex,Arc};
-use std::rc::Rc;
 
 use crate::ParallelPriorityQueue;
 
@@ -14,17 +13,21 @@ pub trait HasKey {
 pub struct ParaBqueue<T:Copy + PartialOrd + Sized + Send>{
     bucketwidth: f64,
     len: usize,
-    data: Vec<Arc<Mutex<VecDeque<T>>>>,
+    data: Vec<Mutex<VecDeque<T>>>,
     start: usize
 }
 
 impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParaBqueue<&'a T> {
     pub fn new(bucketnum: usize, bucketwidth: f64) -> Self {
+        let mut datas:Vec<Mutex<VecDeque<&'a T>>> = Vec::with_capacity(bucketnum);
+        (0..bucketnum).into_iter().for_each(|_i| {
+            datas.push(Mutex::new(VecDeque::new()));
+        });
         return Self {
             len: 0,
             start: bucketnum,
             bucketwidth,
-            data: vec![Arc::new(Mutex::new(VecDeque::new()));bucketnum]
+            data: datas
         }
     }
 
@@ -67,6 +70,21 @@ impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParaBqueue<&'a T> {
     // If we don't want this method, this version can get rid of the len field completely.
     pub fn len(&self) -> usize {
         return self.len;
+    }
+
+    pub fn bulk_push(&mut self, elems:&'a Vec< T>) {
+        
+        elems.into_par_iter().for_each(|i| {
+            let index = (i.key()/self.bucketwidth).floor() as usize;
+            self.data[index].lock().unwrap().push_back(i);
+        });
+        let min = elems.into_par_iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let mindex = (min.key()/self.bucketwidth).floor() as usize;
+        if self.start > mindex {
+            self.start = mindex;
+        }
+
+        self.len = self.len + elems.len();
     }
 
 }
@@ -168,6 +186,33 @@ mod tests {
             assert_eq!(heap1.len(), total-i);
         }
         assert_eq!(heap1.is_empty(), true);
+        
+        //bulk test pray for me
+
+        let mut rng = rand::thread_rng();
+
+        let mut vector = Vec::new();
+
+        for _i in 1..=total {
+            let n:f64 = rng.gen_range(0.0..=max as f64);
+            vector.push(n)
+        }
+        let mut sortvec = vector.clone();
+        sortvec.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        
+        heap1.bulk_push(&vector);     
+        assert_eq!(heap1.len(), total);
+
+        for i in 1..=total {
+            let min = sortvec.remove(0);
+            assert_eq!(heap1.peek().unwrap().floor(), min.floor());
+            assert_eq!(heap1.pop().unwrap().floor(), min.floor());
+            assert_eq!(heap1.len(), total-i);
+        }
+        assert_eq!(heap1.is_empty(), true);
+
+
 
     }
 }
