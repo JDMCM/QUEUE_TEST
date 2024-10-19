@@ -221,14 +221,19 @@ mod tests {
         heap1.bulk_push(&vector);     
         assert_eq!(heap1.len(), total);
 
-        for i in 1..=total {
+        while !heap1.is_empty() {
             let min = sortvec.remove(0);
-            assert_eq!(heap1.peek().unwrap().floor(), min.floor());
-            assert_eq!(heap1.pop().unwrap().floor(), min.floor());
-            assert_eq!(heap1.len(), total-i);
+            sortvec.retain(|i| {
+                ((i.key()/heap1.bucketwidth).floor() as usize) > ((min.key()/heap1.bucketwidth).floor() as usize)
+            });
+            let bulkpopped = heap1.bulk_pop().unwrap();
+            for j in 0..bulkpopped.len(){
+                assert_eq!(bulkpopped[j].floor(), min.floor());
+            }
         }
         assert_eq!(heap1.is_empty(), true);
 
+        //bulk remove test pray even harder may god hear my screams and be merciful upon this humble believer 
 
 
     }
