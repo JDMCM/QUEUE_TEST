@@ -13,7 +13,7 @@ use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct KeyVal {
     pub key:OrderedFloat<f64>, //the time the pair collides at
     pub val:csvreader::Rec, //all information p1,p2,p1x,p2x .. etc
@@ -163,32 +163,32 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
     (now.elapsed(), count)
 }
 
-// fn time_parallel<'a, PQ: ParallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
-//     let now = Instant::now();
+fn time_parallel<'a, PQ: ParallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
+    let now = Instant::now();
 
-//     for i in 0..data.len() {
-//         // Add initial population of events.
-//         let mut ids = HashSet::new();
-//         let mut initial = Vec::new();
-//         for k in &data[i] {
-//             if !ids.contains(&k.id) {
-//                 initial.push(k);
-//                 ids.insert(k.id);
-//             }
-//         }
-//         heap.bulk_push(initial.into_iter());
-//         // Process events in that step
-//         while !heap.is_empty() {
-//             heap.bulk_process(|elem| {
-//                 let id = elem.id;
-//                 let index = elem.index;
-//                 //if the set contains another element with the same id push the first occuring element into the priority queue
-//                 data[i][index+1..].into_iter().find(|k| k.id == id)
-//             });
-//         }
-//     }
-//     (now.elapsed(), 0)
-// }
+    for i in 0..data.len() {
+        // Add initial population of events.
+        let mut ids = HashSet::new();
+        let mut initial:&'a Vec<&KeyVal> = &Vec::new();
+        for k in data[i] {
+            if !ids.contains(&k.id) {
+                initial.push(&k);
+                ids.insert(k.id);
+            }
+        }
+        heap.bulk_push(initial);
+        // Process events in that step
+        while !heap.is_empty() {
+            heap.bulk_process(|elem| {
+                let id = elem.id;
+                let index = elem.index;
+                //if the set contains another element with the same id push the first occuring element into the priority queue
+                data[i][index+1..].into_iter().find(|k| k.id == id)
+            });
+        }
+    }
+    (now.elapsed(), 0)
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
