@@ -5,6 +5,8 @@ use std::collections::VecDeque;
 
 use cmp::Ordering;
 
+use crate::{particle::Particle, vectors::Vector};
+
 #[derive(Debug, serde::Deserialize,Clone, Copy)]
 //#[serde(rename_all = "PascalCase")]
 pub struct Rec {
@@ -25,6 +27,26 @@ pub struct Rec {
     pub p2vy:f64, 
     pub p2vz:f64, 
     pub p2r:f64
+}
+
+impl Rec {
+    pub fn p1(&self) -> Particle {
+        Particle::new(
+            Vector::new(self.p1x, self.p1y, self.p1z),
+            Vector::new(self.p1vx, self.p1vy, self.p1vz),
+            self.p1r,
+            1.0
+        )
+    }
+
+    pub fn p2(&self) -> Particle {
+        Particle::new(
+            Vector::new(self.p2x, self.p2y, self.p2z),
+            Vector::new(self.p2vx, self.p2vy, self.p2vz),
+            self.p2r,
+            1.0
+        )
+    }
 }
 
 impl PartialOrd for Rec {

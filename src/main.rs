@@ -1,12 +1,16 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 pub(crate) use std::{collections::BinaryHeap, f64::consts::PI, time::Instant}; 
+use collisionhandling::process_collision;
 // use parwithmutex::HasKey;
 use rayon::prelude::*;
 
 mod csvreader;
 mod sequentialbucketqueue;
 mod parallelbucketqueue;
+mod collisionhandling;
+mod vectors;
+mod particle;
 //mod tryingmybesthere;
 // mod parwithmutex;
 use ordered_float::OrderedFloat;
@@ -166,8 +170,11 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
             let elem = heap.pop().unwrap();
             let id = elem.id;
             let index = elem.index;
-            //if the set contains another element with the same id push the first occuring element into the priority queue
+            let mut p1 = elem.val.p1();
+            let mut p2 = elem.val.p2();
+            let next_time = process_collision(&mut p1, &mut p2, elem.val.time);
             count += 1;
+            //if the set contains another element with the same id push the first occuring element into the priority queue
             data[i][index+1..].into_iter().find(|k| k.id == id).iter().for_each(|k| heap.push(k));
         }
     }
@@ -193,6 +200,9 @@ fn time_parallel<'a, PQ: ParallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<K
             heap.bulk_process(|elem| {
                 let id = elem.id;
                 let index = elem.index;
+                let mut p1 = elem.val.p1();
+                let mut p2 = elem.val.p2();
+                let next_time = process_collision(&mut p1, &mut p2, elem.val.time);
                 //if the set contains another element with the same id push the first occuring element into the priority queue
                 data[i][index+1..].into_iter().find(|k| k.id == id)
             });

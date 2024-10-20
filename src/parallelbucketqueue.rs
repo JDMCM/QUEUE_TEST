@@ -43,8 +43,6 @@ impl<'a, T:HasKey + Send + Sync> ParBqueue<&'a T> {
         }
     }
 
-   
-
     pub fn peek(&self) -> Option<&T> {
         if self.is_empty() {
             return None
@@ -81,6 +79,7 @@ impl<'a, T:HasKey + Send + Sync> ParBqueue<&'a T> {
     pub fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a T> {
         self.data.push(Mutex::new(Vec::new()));
         let bucket = self.data.swap_remove(self.start).into_inner().unwrap();
+        // println!("{}", bucket.len());
         self.advance_start();
         bucket.into_par_iter()
     }
