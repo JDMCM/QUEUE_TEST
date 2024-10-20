@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use ordered_float::OrderedFloat;
-use crossbeam_queue::SegQueue;
 
 use crate::SeqentialPriorityQueue;
 
@@ -11,7 +10,6 @@ pub trait HasKey {
 #[derive(Debug)]
 pub struct Bqueue<T:Copy + PartialOrd>{
     bucketwidth: f64,
-    //len: usize,
     data: Vec<VecDeque<T>>,
     start: usize
 }
@@ -19,7 +17,6 @@ pub struct Bqueue<T:Copy + PartialOrd>{
 impl<'a, T:PartialOrd + HasKey> Bqueue<&'a T> {
     pub fn new(bucketnum: usize, bucketwidth: f64) -> Self {
         return Self {
-            //len: 0,
             start: bucketnum,
             bucketwidth,
             data: vec![VecDeque::new();bucketnum]
@@ -29,7 +26,6 @@ impl<'a, T:PartialOrd + HasKey> Bqueue<&'a T> {
     pub fn push(&mut self, elem: &'a T) {
         let index = (elem.key()/self.bucketwidth).floor() as usize;
         self.data[index].push_back(elem);
-        //self.len += 1;
         if index < self.start {
             self.start = index;
         }
@@ -40,7 +36,6 @@ impl<'a, T:PartialOrd + HasKey> Bqueue<&'a T> {
             return None
         } else {
             let y = self.data[self.start].pop_front();
-            //self.len -= 1;
             while self.start < self.data.len() && self.data[self.start].is_empty() {
                 self.start = self.start +1;
             }
@@ -59,12 +54,6 @@ impl<'a, T:PartialOrd + HasKey> Bqueue<&'a T> {
     pub fn is_empty(&self) -> bool {
         return self.start >= self.data.len();
     }
-
-    // If we don't want this method, this version can get rid of the len field completely.
-    // pub fn len(&self) -> usize {
-    //     return self.len;
-    // }
-
 }
 
 impl <'a, E: Ord + HasKey> SeqentialPriorityQueue<'a, E> for Bqueue<&'a E> {
@@ -151,7 +140,7 @@ mod tests {
         }
         //assert_eq!(heap1.len(), total);
 
-        for i in 1..=total {
+        for _ in 1..=total {
             let min = sortvec.remove(0);
             assert_eq!(heap1.peek().unwrap().floor(), min.floor());
             assert_eq!(heap1.pop().unwrap().floor(), min.floor());

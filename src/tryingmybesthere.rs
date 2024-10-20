@@ -49,7 +49,7 @@ impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParBqueue<&'a T> {
         }
     }
 
-    pub fn bulk_push(&mut self, elem: Vec<&'a T>) {
+    pub fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I) {
         // let mathed: Vec<(T,usize)> = elem.into_par_iter().map(|i| {
         //     return (i,(i.key()/self.bucetwidth).floor() as usize)
         // }).collect();
@@ -99,7 +99,7 @@ impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for
     fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
 
     }
-    fn bulk_push<I: Iterator<Item = &'a E>>(&mut self, es: I) {
+    fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I) {
       
     }
 }

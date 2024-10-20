@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 pub(crate) use std::{collections::BinaryHeap, f64::consts::PI, time::Instant}; 
-use parwithmutex::HasKey;
+// use parwithmutex::HasKey;
 use rayon::prelude::*;
 
 mod csvreader;
 mod sequentialbucketqueue;
-//mod parallelbucketqueue;
+mod parallelbucketqueue;
 //mod tryingmybesthere;
-mod parwithmutex;
+// mod parwithmutex;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::time::Duration;
@@ -65,51 +65,63 @@ impl <'a, E: Ord> SeqentialPriorityQueue<'a, E> for BinaryHeap<&'a E> {
     }
 }
 
-pub trait ParallelPriorityQueue<'a, E:PartialOrd+Copy+Send+Sync+ 'a> {
+pub trait ParallelPriorityQueue<'a, E: Ord + 'a> {
     fn push(&mut self, e: &'a E);
     fn pop(&mut self) -> Option<&E>;
     fn is_empty(&self) -> bool;
-    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F);
-    fn bulk_push(&mut self, elems:&'a Vec<E>);
-    fn bulk_pop(&mut self) -> Vec<&E>;
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E> + Sync + Send>(&mut self, f: F);
+    fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I);
+    fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a E>;
 }
 
-// struct LockingBinaryHeap<'a, E: Ord> {
-//     pub locked_heap: Mutex<BinaryHeap<&'a E>>
-// }
+struct LockingBinaryHeap<'a, E: Ord + Send + Sync> {
+    pub locked_heap: Mutex<BinaryHeap<&'a E>>
+}
 
-// impl <'a, E: Ord> ParallelPriorityQueue<'a, E> for LockingBinaryHeap<'a, E> {
-//     fn push(&mut self, e: &'a E) {
-//         let mut bh = self.locked_heap.lock().unwrap();
-//         bh.push(e);
-//     }
-//     fn pop(&mut self) -> Option<&E> {
-//         let mut bh = self.locked_heap.lock().unwrap();
-//         bh.pop()
-//     }
-//     fn is_empty(&self) -> bool {
-//         let bh = self.locked_heap.lock().unwrap();
-//         bh.is_empty()
-//     }
-//     fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
-//         let mut bh = self.locked_heap.lock().unwrap();
-//         // Pull off a certain number of elements. There should be checking for whether they are safe.
-//         // Then run the function on those elements.
-//         // Push the results.
-//     }
-//     fn bulk_push<I: Iterator<Item = &'a E>>(&mut self, es: I) {
-//         let mut bh = self.locked_heap.lock().unwrap();
-//         for e in es {
-//             bh.push(e);
-//         }
-//     }
-// }
+impl <'a, E: Ord + Send + Sync> ParallelPriorityQueue<'a, E> for LockingBinaryHeap<'a, E> {
+    fn push(&mut self, e: &'a E) {
+        let mut bh = self.locked_heap.lock().unwrap();
+        bh.push(e);
+    }
+    fn pop(&mut self) -> Option<&E> {
+        let mut bh = self.locked_heap.lock().unwrap();
+        bh.pop()
+    }
+    fn is_empty(&self) -> bool {
+        let bh = self.locked_heap.lock().unwrap();
+        bh.is_empty()
+    }
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E> + Sync + Send>(&mut self, f: F) {
+        let bucket = self.bulk_pop();
+        let mapped: Vec<&'a E> = bucket.map(f).flatten().collect();
+        self.bulk_push(mapped.into_par_iter());
+    }
+
+    fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I) {
+        es.for_each(|e| {
+            let mut bh = self.locked_heap.lock().unwrap();
+            bh.push(e);
+        });
+    }
+
+    fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a E> {
+        let mut ret: Vec<&'a E> = Vec::new();
+        //let skip_percent = 0.1;
+        let bucket_size = 24;
+        // TODO: implement skips
+        let mut bh = self.locked_heap.lock().unwrap();
+        while ret.len() < bucket_size && !bh.is_empty() {
+            ret.push(bh.pop().unwrap());
+        }
+        ret.into_par_iter()
+    }
+}
 
 struct ParMutexBucket<'a, E: PartialOrd+Copy+Send+Sync> {
-    pub parabucket: parwithmutex::ParaBqueue<&'a E>
+    pub parabucket: parallelbucketqueue::ParBqueue<&'a E>
 }
 
-impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for ParMutexBucket<'a, E> {
+impl <'a, E: Copy + Ord + sequentialbucketqueue::HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for ParMutexBucket<'a, E> {
     fn push(&mut self, e: &'a E) {
         self.parabucket.push(e)
     }
@@ -119,18 +131,17 @@ impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for
     fn is_empty(&self) -> bool {
         self.parabucket.is_empty()
     }
-    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
-        //let mut bh = self.parabucket;
-        // Pull off a certain number of elements. There should be checking for whether they are safe.
-        // Then run the function on those elements.
-        // Push the results.
-    }
-    fn bulk_push(&mut self, elems:&'a Vec<E>) {
-        self.parabucket.bulk_push(elems);
-        
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E> + Sync + Send>(&mut self, f: F) {
+        let bucket = self.bulk_pop();
+        let mapped: Vec<&'a E> = bucket.map(f).flatten().collect();
+        self.bulk_push(mapped.into_par_iter());
     }
 
-    fn bulk_pop(&mut self) -> Vec<&E> {
+    fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I) {
+        self.parabucket.bulk_push(es);
+    }
+
+    fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a E> {
         self.parabucket.bulk_pop()
     }
 }
@@ -169,14 +180,14 @@ fn time_parallel<'a, PQ: ParallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<K
     for i in 0..data.len() {
         // Add initial population of events.
         let mut ids = HashSet::new();
-        let mut initial:&'a Vec<&KeyVal> = &Vec::new();
-        for k in data[i] {
+        let mut initial: Vec<&'a KeyVal> = Vec::new();
+        for k in &data[i] {
             if !ids.contains(&k.id) {
                 initial.push(&k);
                 ids.insert(k.id);
             }
         }
-        heap.bulk_push(initial);
+        heap.bulk_push(initial.into_par_iter());
         // Process events in that step
         while !heap.is_empty() {
             heap.bulk_process(|elem| {
@@ -220,24 +231,26 @@ fn main() {
         data[index].push(KeyVal{key:OrderedFloat(poppy.time),val:poppy,id:(poppy.p1 as u32,poppy.p2 as u32),index: ind});
 
     }
-    // let now = Instant::now();
 
-    let mut heapt: BinaryHeap<&KeyVal> = BinaryHeap::new();
+    let mut heapt = BinaryHeap::new();
     let elapsed = time_seqential(&data, &mut heapt);
     println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
-    // let now1 = Instant::now();
-
     let delta:f64 = 2.0*PI*1E-4 - 2.0*PI*1E-5;
-
-
-    let mut heap1: sequentialbucketqueue::Bqueue<&KeyVal> = sequentialbucketqueue::Bqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
+    let mut heap1 = sequentialbucketqueue::Bqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
     let elapsed1 = time_seqential(&data, &mut heap1);
     println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
     //println!("{}",data[100].len());
     //println!("first p1: {}",arecord[0].p1);
 
+    // Parallel
+    let mut heap_bin_par = LockingBinaryHeap { locked_heap: Mutex::new(BinaryHeap::new()) };
+    let elapsed = time_parallel(&data, &mut heap_bin_par);
+    println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
+    let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
+    let elapsed1 = time_parallel(&data, &mut heap_bucket_par);
+    println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
 }

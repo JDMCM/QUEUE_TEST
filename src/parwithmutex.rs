@@ -73,31 +73,29 @@ impl<'a, T:Copy + PartialOrd + HasKey + Send + Sync> ParaBqueue<&'a T> {
         return self.len;
     }
 
-    pub fn bulk_push(&mut self, elems:&'a Vec< T>) {
-        
-        elems.into_par_iter().for_each(|i| {
+    fn bulk_push<I: ParallelIterator<Item = &'a T>>(&mut self, elems: I) {
+        let mut mindex = self.data.len();
+        elems.for_each(|i| {
             let index = (i.key()/self.bucketwidth).floor() as usize;
+            if index < mindex {
+                mindex = index;
+            }
             self.data[index].lock().unwrap().push(i);
         });
-        let min = elems.into_par_iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let mindex = (min.key()/self.bucketwidth).floor() as usize;
         if self.start > mindex {
             self.start = mindex;
         }
 
-        self.len = self.len + elems.len();
     }
 
-    pub fn bulk_pop(&mut self) ->  Vec<&T> {
+    fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a T> {
         self.data.push(Mutex::new(Vec::new()));
         let bucket = self.data.swap_remove(self.start).into_inner().unwrap();
         self.len = self.len - bucket.len();
         while self.start < self.data.len() && self.data[self.start].lock().unwrap().is_empty() {
               self.start = self.start +1;
         }
-        return bucket;
-        
-        
+        return bucket.into_iter();
     }
 
 
@@ -113,14 +111,14 @@ impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for
     fn is_empty(&self) -> bool {
         ParaBqueue::is_empty(self)
     }
-    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E> + Sync + Send>(&mut self, f: F) {
 
     }
-    fn bulk_push(&mut self, elems:&'a Vec<E>) {
-        ParaBqueue::bulk_push(self, elems);
+    fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I) {
+        ParaBqueue::bulk_push(self, es);
     }
 
-    fn bulk_pop(&mut self) -> Vec<&E> {
+    fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a E> {
         ParaBqueue::bulk_pop(self)
     }
 }
@@ -219,7 +217,7 @@ mod tests {
         sortvec.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         
-        heap1.bulk_push(&vector);     
+        heap1.bulk_push(vector.iter());     
         assert_eq!(heap1.len(), total);
 
         while !heap1.is_empty() {
@@ -228,8 +226,8 @@ mod tests {
                 ((i.key()/heap1.bucketwidth).floor() as usize) > ((min.key()/heap1.bucketwidth).floor() as usize)
             });
             let bulkpopped = heap1.bulk_pop();
-            for j in 0..bulkpopped.len(){
-                assert_eq!(bulkpopped[j].floor(), min.floor());
+            for pop in bulkpopped {
+                assert_eq!(pop.floor(), min.floor());
             }
         }
         assert_eq!(heap1.is_empty(), true);
