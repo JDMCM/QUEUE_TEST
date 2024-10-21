@@ -30,6 +30,28 @@ pub struct Rec {
 }
 
 impl Rec {
+    pub fn new(i1: f64, i2: f64, p1: &Particle, p2: &Particle, event_time: f64) -> Self {
+        Rec {
+            p1: i1,
+            p2: i2,
+            time: event_time,
+            p1x: p1.p.x(),
+            p1y: p1.p.y(),
+            p1z: p1.p.z(),
+            p1vx: p1.v.x(),
+            p1vy: p1.v.y(),
+            p1vz: p1.v.z(),
+            p1r: p1.r,
+            p2x: p2.p.x(),
+            p2y: p2.p.y(),
+            p2z: p2.p.z(),
+            p2vx: p2.v.x(),
+            p2vy: p2.v.y(),
+            p2vz: p2.v.z(),
+            p2r: p2.r,
+        }
+    }
+
     pub fn p1(&self) -> Particle {
         Particle::new(
             Vector::new(self.p1x, self.p1y, self.p1z),

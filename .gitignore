@@ -1,4 +1,4 @@
-event_dump.*
+event*
 
 .bsp/
 .scala-build/

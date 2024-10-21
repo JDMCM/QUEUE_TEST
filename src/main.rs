@@ -17,6 +17,8 @@ use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::time::Duration;
 
+const DELTA:f64 = 2.0*PI*1E-4 - 2.0*PI*1E-5;
+
 #[derive(Debug, Clone, Copy)]
 pub struct KeyVal {
     pub key:OrderedFloat<f64>, //the time the pair collides at
@@ -150,14 +152,15 @@ impl <'a, E: Copy + Ord + sequentialbucketqueue::HasKey + Send + Sync> ParallelP
     }
 }
 
-fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
+fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a mut Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64, f64) {
     let now = Instant::now();
     let mut count = 0;
+    let mut time_sum = 0.0;
 
     for i in 0..data.len() {
         // Add initial population of events. In a real simulation, this also happens in parallel because we are walking throug the tree in
         // parallel doing the search. I'm not certain how to model that here.
-        let mut ids = HashSet::new();        
+        let mut ids = HashSet::new();
         for k in &data[i] {
             if !ids.contains(&k.id) {
                 heap.push(k);
@@ -174,11 +177,23 @@ fn time_seqential<'a, PQ: SeqentialPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec
             let mut p2 = elem.val.p2();
             let next_time = process_collision(&mut p1, &mut p2, elem.val.time);
             count += 1;
+            time_sum += next_time;
+            // if next_time < (i + 1) as f64 * DELTA {
+            //     let new_index = data[i].len();
+            //     let next_event = KeyVal {
+            //         key: OrderedFloat(next_time),
+            //         val: csvreader::Rec::new(id.0 as f64, id.1 as f64, &p1, &p2, next_time),
+            //         id: id,
+            //         index: new_index
+            //     };
+            //     data[i].push(next_event);
+            //     heap.push(data[i].last().unwrap());
+            // }
             //if the set contains another element with the same id push the first occuring element into the priority queue
             data[i][index+1..].into_iter().find(|k| k.id == id).iter().for_each(|k| heap.push(k));
         }
     }
-    (now.elapsed(), count)
+    (now.elapsed(), count, time_sum)
 }
 
 fn time_parallel<'a, PQ: ParallelPriorityQueue<'a, KeyVal>>(data : &'a Vec<Vec<KeyVal>>, heap: &'a mut PQ) -> (Duration, i64) {
@@ -236,19 +251,18 @@ fn main() {
         let poppy = arecord.pop_front().unwrap();
         //uses the max to find which global timestep each record belongs to then places them 
         //in the corresponding vector
-        let index:usize = (poppy.time/(max/500.0)).floor() as usize;
+        let index:usize = (poppy.time/(max/100.0)).floor() as usize;
         let ind = data[index].len();
         data[index].push(KeyVal{key:OrderedFloat(poppy.time),val:poppy,id:(poppy.p1 as u32,poppy.p2 as u32),index: ind});
 
     }
 
     let mut heapt = BinaryHeap::new();
-    let elapsed = time_seqential(&data, &mut heapt);
+    let elapsed = time_seqential(&mut data, &mut heapt);
     println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
-    let delta:f64 = 2.0*PI*1E-4 - 2.0*PI*1E-5;
-    let mut heap1 = sequentialbucketqueue::Bqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
-    let elapsed1 = time_seqential(&data, &mut heap1);
+    let mut heap1 = sequentialbucketqueue::Bqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
+    let elapsed1 = time_seqential(&mut data, &mut heap1);
     println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
     //println!("{}",data[100].len());
@@ -259,7 +273,7 @@ fn main() {
     let elapsed = time_parallel(&data, &mut heap_bin_par);
     println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
-    let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/delta).ceil()+1.0) as usize,delta); //intialize the Bucket queue
+    let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
     let elapsed1 = time_parallel(&data, &mut heap_bucket_par);
     println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
