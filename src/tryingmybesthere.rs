@@ -96,7 +96,7 @@ impl <'a, E: Copy + Ord + HasKey + Send + Sync> ParallelPriorityQueue<'a, E> for
     fn is_empty(&self) -> bool {
         ParBqueue::is_empty(self)
     }
-    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) {
+    fn bulk_process<F: Fn(&'a E) -> Option<&'a E>>(&mut self, f: F) -> i32 {
 
     }
     fn bulk_push<I: ParallelIterator<Item = &'a E>>(&mut self, es: I) {

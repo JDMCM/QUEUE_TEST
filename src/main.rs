@@ -14,6 +14,7 @@ mod particle;
 //mod tryingmybesthere;
 // mod parwithmutex;
 use ordered_float::OrderedFloat;
+use sequentialbucketqueue::HasKey;
 use std::cmp::Ordering;
 use std::time::Duration;
 
@@ -81,10 +82,11 @@ pub trait ParallelPriorityQueue<'a, E: Ord + 'a> {
 }
 
 struct LockingBinaryHeap<'a, E: Ord + Send + Sync> {
-    pub locked_heap: Mutex<BinaryHeap<&'a E>>
+    bucketwidth: f64,
+    locked_heap: Mutex<BinaryHeap<&'a E>>
 }
 
-impl <'a, E: Ord + Send + Sync> ParallelPriorityQueue<'a, E> for LockingBinaryHeap<'a, E> {
+impl <'a, E: Ord + Send + Sync + HasKey> ParallelPriorityQueue<'a, E> for LockingBinaryHeap<'a, E> {
     fn push(&mut self, e: &'a E) {
         let mut bh = self.locked_heap.lock().unwrap();
         bh.push(e);
@@ -112,11 +114,10 @@ impl <'a, E: Ord + Send + Sync> ParallelPriorityQueue<'a, E> for LockingBinaryHe
 
     fn bulk_pop(&mut self) -> impl ParallelIterator<Item = &'a E> {
         let mut ret: Vec<&'a E> = Vec::new();
-        //let skip_percent = 0.1;
-        let bucket_size = 24;
         // TODO: implement skips
         let mut bh = self.locked_heap.lock().unwrap();
-        while ret.len() < bucket_size && !bh.is_empty() {
+        let first_index = (bh.peek().unwrap().key()/self.bucketwidth).floor() as usize;
+        while !bh.is_empty() && (bh.peek().unwrap().key()/self.bucketwidth).floor() as usize == first_index {
             ret.push(bh.pop().unwrap());
         }
         ret.into_par_iter()
@@ -257,24 +258,24 @@ fn main() {
 
     }
 
-    let mut heapt = BinaryHeap::new();
-    let elapsed = time_seqential(&mut data, &mut heapt);
-    println!("Binary Heap Elapsed: {:.2?}", elapsed);
+    // let mut heapt = BinaryHeap::new();
+    // let elapsed = time_seqential(&mut data, &mut heapt);
+    // println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
-    let mut heap1 = sequentialbucketqueue::Bqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
-    let elapsed1 = time_seqential(&mut data, &mut heap1);
-    println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
+    // let mut heap1 = sequentialbucketqueue::Bqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
+    // let elapsed1 = time_seqential(&mut data, &mut heap1);
+    // println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
     //println!("{}",data[100].len());
     //println!("first p1: {}",arecord[0].p1);
 
     // Parallel
-    let mut heap_bin_par = LockingBinaryHeap { locked_heap: Mutex::new(BinaryHeap::new()) };
+    let mut heap_bin_par = LockingBinaryHeap { bucketwidth: DELTA, locked_heap: Mutex::new(BinaryHeap::new()) };
     let elapsed = time_parallel(&data, &mut heap_bin_par);
     println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
-    let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
-    let elapsed1 = time_parallel(&data, &mut heap_bucket_par);
-    println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
+    // let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
+    // let elapsed1 = time_parallel(&data, &mut heap_bucket_par);
+    // println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
 }
