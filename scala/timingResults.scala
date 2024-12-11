@@ -1,9 +1,19 @@
 import scala.collection.immutable.ArraySeq
 
+val counts = ArraySeq(10000, 30000, 100000, 300000, 1000000)
+
 def calc(nums: ArraySeq[Double]): (Double, Double) = {
   val avg = nums.sum / nums.length
   val std = nums.map(_ - avg).map(x => x*x).sum
   (avg, math.sqrt(std / nums.length))
+}
+
+def printForSwiftVis(results: ArraySeq[ArraySeq[(Double, Double)]]): Unit = {
+  for ((batch, index) <- results.zipWithIndex) {
+    for (((v, std), cnt) <- batch.zip(counts)) {
+      println(s"$index $cnt $v $std") 
+    }
+  }
 }
 
 @main def timingResults(): Unit = {
@@ -40,4 +50,6 @@ def calc(nums: ArraySeq[Double]): (Double, Double) = {
   println(s"seqBQ = ${seqBQ.map(calc)}")
   println(s"parBH = ${parBH.map(calc)}")
   println(s"parBQ = ${parBQ.map(calc)}")
+
+  printForSwiftVis(ArraySeq(seqBH.map(calc), seqBQ.map(calc), parBH.map(calc), parBQ.map(calc)))
 }
