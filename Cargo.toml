@@ -17,3 +17,6 @@ serde = { version = "1.0.209", features = ["derive"] }
 [[bin]]
 name = "QUEUE_TEST"
 path = "src/main.rs"
+
+[profile.release]
+debug = true
