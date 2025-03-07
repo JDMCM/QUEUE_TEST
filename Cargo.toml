@@ -13,10 +13,15 @@ ordered-float = "4.2.2"
 rand = "0.8.5"
 rayon = "1.10.0"
 serde = { version = "1.0.209", features = ["derive"] }
+flamegraph = "0.6.7"
 
 [[bin]]
 name = "QUEUE_TEST"
 path = "src/main.rs"
 
 [profile.release]
+<<<<<<< Updated upstream
 debug = true
+=======
+debug = true
+>>>>>>> Stashed changes

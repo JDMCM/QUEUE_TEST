@@ -269,7 +269,7 @@ fn main() {
     //println!("{}",data[100].len());
     //println!("first p1: {}",arecord[0].p1);
 
-    // Parallel
+    //Parallel
     let mut heap_bin_par = LockingBinaryHeap { bucketwidth: DELTA, locked_heap: Mutex::new(BinaryHeap::new()) };
     let elapsed = time_parallel(&data, &mut heap_bin_par);
     println!("Binary Heap Elapsed: {:.2?}", elapsed);
