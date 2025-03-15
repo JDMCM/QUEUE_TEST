@@ -270,12 +270,12 @@ fn main() {
     //println!("first p1: {}",arecord[0].p1);
 
     // Parallel
-    let mut heap_bin_par = LockingBinaryHeap { bucketwidth: DELTA, locked_heap: Mutex::new(BinaryHeap::new()) };
-    let elapsed = time_parallel(&data, &mut heap_bin_par);
-    println!("Binary Heap Elapsed: {:.2?}", elapsed);
+    // let mut heap_bin_par = LockingBinaryHeap { bucketwidth: DELTA, locked_heap: Mutex::new(BinaryHeap::new()) };
+    // let elapsed = time_parallel(&data, &mut heap_bin_par);
+    // println!("Binary Heap Elapsed: {:.2?}", elapsed);
 
-    // let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
-    // let elapsed1 = time_parallel(&data, &mut heap_bucket_par);
-    // println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
+    let mut heap_bucket_par: parallelbucketqueue::ParBqueue<&KeyVal> = parallelbucketqueue::ParBqueue::new(((max/DELTA).ceil()+1.0) as usize,DELTA); //intialize the Bucket queue
+    let elapsed1 = time_parallel(&data, &mut heap_bucket_par);
+    println!("Bucket Queue Elapsed: {:.2?}", elapsed1);
 
 }
